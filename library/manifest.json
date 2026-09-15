@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "meta": {
     "name": "Library",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "logoPath": "logo.png",
     "shortDescription": "Per-user unified media library for Dogebox",
     "longDescription": "Front-end for the existing Radarr + Sonarr + Prowlarr + Jellyfin stack. Per-user profiles (filters out items already in each Jellyfin user's library), unified search, one-click add, starter packs, IMDb/Trakt watchlist import, free-text Tonight recommender, and a \ud83c\udfb2 Random Pick button. No new indexers, no new download pipeline, no new library model.",
@@ -19,7 +19,7 @@
   "container": {
     "build": {
       "nixFile": "pup.nix",
-      "nixFileSha256": "ad58c6c0953b53d5aee34eefe6dffa6f527435d7474eeb9369d993c93088bed5"
+      "nixFileSha256": "0a51d56721a5ba081faf98da6e249d94ce4c935f411140d3d14b8dfd430d9b1e"
     },
     "services": [
       {

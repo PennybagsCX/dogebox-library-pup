@@ -4,7 +4,9 @@
 
 **One URL for your Dogebox media stack.** Unified search across movies + shows, one-click add, curated starter packs, IMDb/Trakt watchlist import, and a free-text "Tonight" recommender — all on top of the existing Radarr + Sonarr + Prowlarr + Jellyfin apps you already have.
 
-> **Latest:** v0.0.5 — v0.0.3 features plus per-user profiles (filter out items each Jellyfin user has already in their library) and a 🎲 Random Pick button. Fixes a Jellyfin auth-header bug (was sending `X-Api-Key`; Jellyfin needs `X-Emby-Token`) and a crash on movies whose TMDB `genres` field comes back as a string instead of a list.
+> **Latest:** v0.0.6 — fixes the v0.0.5 install bug where `pup.nix` used `builtins.readFile ./run.sh` (no Nix antiquotation) so the bundled shebang was literally `#!${pkgs.stdenv.shell}` and systemd refused with `Exec format error`. v0.0.6 uses the inline-heredoc form so `${pkgs.*}` references are resolved at evaluation time, plus a separate `run.sh` source file is shipped for inspection. No behavioural change vs v0.0.5.
+>> 
+>> Previous: v0.0.5 — v0.0.3 features plus per-user profiles (filter out items each Jellyfin user has already in their library) and a 🎲 Random Pick button. Fixes a Jellyfin auth-header bug (was sending `X-Api-Key`; Jellyfin needs `X-Emby-Token`) and a crash on movies whose TMDB `genres` field comes back as a string instead of a list.
 
 ## Why
 
