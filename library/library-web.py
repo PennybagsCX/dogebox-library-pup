@@ -34,7 +34,13 @@ def _api_get(base_url, api_key, path, params=None, timeout=8):
     url = base_url.rstrip("/") + path
     if params:
         url += "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"X-Api-Key": api_key} if api_key else {}, method="GET")
+    # Jellyfin uses X-Emby-Token; *arr apps use X-Api-Key. The same key
+    # value works for both header names — we send both.
+    h = {}
+    if api_key:
+        h["X-Api-Key"] = api_key
+        h["X-Emby-Token"] = api_key
+    req = urllib.request.Request(url, headers=h, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read().decode("utf-8", errors="replace")
@@ -46,7 +52,10 @@ def _api_get(base_url, api_key, path, params=None, timeout=8):
 def _api_post(base_url, api_key, path, body, headers=None, timeout=8):
     url = base_url.rstrip("/") + path
     body_bytes = json.dumps(body).encode("utf-8") if not isinstance(body, (bytes, str)) else (body.encode("utf-8") if isinstance(body, str) else body)
-    h = {"X-Api-Key": api_key} if api_key else {}
+    h = {}
+    if api_key:
+        h["X-Api-Key"] = api_key
+        h["X-Emby-Token"] = api_key
     if headers: h.update(headers)
     h.setdefault("Content-Type", "application/json")
     req = urllib.request.Request(url, data=body_bytes, headers=h, method="POST")
@@ -215,8 +224,8 @@ def _tonight(up, q):
     results = []
     for m in radarr_hits[:12]:
         score = 100
+        m_genres = _genres(m)
         if genres:
-            m_genres = [g["name"].lower() for g in m.get("genres",[])] if isinstance(m.get("genres"), list) else []
             if any(g in m_genres for g in genres): score += 50
             else: score -= 30
         if decade and m.get("year"):
@@ -225,26 +234,53 @@ def _tonight(up, q):
         if m.get("runtime"):
             if any(k in q.lower() for k in ["short","under"]) and m["runtime"] < 30: score += 10
             if any(k in q.lower() for k in ["long","epic"]) and m["runtime"] > 120: score += 10
-        if m.get("ratings",{}).get("imdb",{}).get("value",0) >= 7: score += 15
+        if _imdb_rating(m) >= 7: score += 15
         results.append({
             "kind": "movie", "title": m.get("title"), "year": m.get("year"), "score": score,
             "summary": m.get("overview","")[:300],
             "runtime": m.get("runtime"), "tmdbId": m.get("tmdbId"),
-            "poster": m.get("remotePoster"), "genres": m.get("genres",[]) if isinstance(m.get("genres"), list) else [],
+            "poster": m.get("remotePoster"), "genres": m_genres,
         })
     for s in sonarr_hits[:12]:
         score = 90
+        s_genres = _genres(s)
         if genres:
-            s_genres = [g.lower() for g in s.get("genres",[])] if isinstance(s.get("genres"), list) else []
             if any(g in s_genres for g in genres): score += 50
             else: score -= 30
         results.append({
             "kind": "series", "title": s.get("title"), "year": s.get("year"), "score": score,
             "summary": s.get("overview","")[:300] if isinstance(s.get("overview"),str) else "",
             "tvdbId": s.get("tvdbId"),
+            "genres": s_genres,
         })
     results.sort(key=lambda r: -r["score"])
     return {"query": original, "genres": genres, "decade": decade, "results": results[:12]}
+
+def _genres(item):
+    """Radarr/Sonarr lookup can return genres as a list of dicts
+    [{id,name}] OR as a comma-separated string OR as None. Normalise to a
+    lowercase list of names."""
+    g = item.get("genres")
+    if not g: return []
+    if isinstance(g, list):
+        out = []
+        for x in g:
+            if isinstance(x, dict) and "name" in x: out.append(x["name"].lower())
+            elif isinstance(x, str): out.append(x.lower())
+        return out
+    if isinstance(g, str):
+        return [s.strip().lower() for s in g.split(",") if s.strip()]
+    return []
+
+def _imdb_rating(item):
+    """Pull IMDB rating defensively — some lookups return ratings as a
+    nested dict, others as a flat float, others missing entirely."""
+    r = item.get("ratings")
+    if not r or not isinstance(r, dict): return 0
+    imdb = r.get("imdb")
+    if not isinstance(imdb, dict): return 0
+    try: return float(imdb.get("value") or 0)
+    except (TypeError, ValueError): return 0
 
 def _status_snapshot(up):
     import datetime
@@ -274,6 +310,51 @@ def _status_snapshot(up):
             snap["recent_quarantine"] = [l.strip() for l in lines]
     except Exception: pass
     return snap
+
+# ----- v0.0.5: per-user profiles -----
+# Jellyfin's /Users/<id>/Items returns everything the user has in their library
+# (across all libraries). For the "watched/unwatched" filter, we use
+# /Users/<id>/Items?Filters=IsUnplayed to exclude items the user has already
+# played. Either way, this is the user's *library* — items already added
+# to Radarr/Sonarr or directly to Jellyfin.
+def _jellyfin_users(up):
+    code, body = _api_get(up["jellyfin"]["url"], up["jellyfin"]["key"], "/Users")
+    if code != 200: return []
+    try: return json.loads(body)
+    except Exception: return []
+
+def _jellyfin_user_library(up, user_id, exclude_played=False):
+    """Returns set of TMDB IDs (movies) and TVDB IDs (series) in the user's library.
+    exclude_played=True: skip items the user has fully watched (so the search
+    shows NEW content, not their entire library)."""
+    if not user_id: return set()
+    extra = "&Filters=IsUnplayed" if exclude_played else ""
+    # We pull both movies and series separately; Jellyfin's generic /Items
+    # would include all types and mix ProviderIds.
+    have = set()
+    for itype in ("Movie", "Series"):
+        path = f"/Users/{user_id}/Items?IncludeItemTypes={itype}{extra}&Recursive=true&Limit=500"
+        code, body = _api_get(up["jellyfin"]["url"], up["jellyfin"]["key"], path, params=None, timeout=15)
+        if code != 200: continue
+        try:
+            arr = json.loads(body).get("Items", [])
+        except Exception:
+            continue
+        for it in arr:
+            prov = it.get("ProviderIds", {}) or {}
+            if itype == "Movie" and prov.get("Tmdb"):
+                have.add(int(prov["Tmdb"]))
+            elif itype == "Series" and prov.get("Tvdb"):
+                have.add(int(prov["Tvdb"]))
+    return have
+
+def _apply_user_filter(movies, series, have_set):
+    if not have_set: return movies, series
+    movies = [m for m in movies if int(m.get("tmdbId") or 0) not in have_set]
+    series  = [s for s in series  if int(s.get("tvdbId") or 0) not in have_set]
+    for m in movies: m["__already"] = True   # mark as already-in-library for UI
+    for s in series:  s["__already"] = True
+    return movies, series
 
 CSS = """
 body{font-family:system-ui,Segoe UI,sans-serif;margin:0;background:#0f0f17;color:#eee;line-height:1.45}
@@ -373,8 +454,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, "application/javascript", LIVE_JS)
             return
 
+        if u.path == "/api/users":
+            users = _jellyfin_users(up)
+            return self._json([{"id": u["Id"], "name": u["Name"], "admin": u.get("IsAdministrator", False)} for u in users])
+
         if u.path == "/api/search":
             term = (qs.get("q") or [""])[0].strip()
+            user_id = (qs.get("user") or [""])[0].strip()
             if not term: return self._json({"movies":[],"series":[]})
             m = _search_radarr(up, term)[:8]
             s = _search_sonarr(up, term)[:8]
@@ -388,6 +474,9 @@ class Handler(BaseHTTPRequestHandler):
                 for x in json.loads(body): sonarr_existing[x.get("tvdbId")] = x
             for x in m: x["__already"] = x.get("tmdbId") in radarr_existing
             for x in s: x["__already"] = x.get("tvdbId") in sonarr_existing
+            if user_id:
+                have = _jellyfin_user_library(up, user_id, exclude_played=False)
+                m, s = _apply_user_filter(m, s, have)
             return self._json({"movies": m, "series": s})
 
         if u.path == "/api/status":
@@ -395,13 +484,52 @@ class Handler(BaseHTTPRequestHandler):
 
         if u.path == "/api/tonight":
             q = (qs.get("q") or [""])[0].strip()
+            user_id = (qs.get("user") or [""])[0].strip()
             if not q: return self._json({"error":"missing q"}, 400)
-            return self._json(_tonight(up, q))
+            rec = _tonight(up, q)
+            if user_id:
+                have = _jellyfin_user_library(up, user_id, exclude_played=True)
+                rec["movies"] = [m for m in rec.get("movies", []) if int(m.get("tmdbId") or 0) not in have]
+                rec["series"] = [s for s in rec.get("series", []) if int(s.get("tvdbId") or 0) not in have]
+            return self._json(rec)
+
+        if u.path == "/api/random":
+            user_id = (qs.get("user") or [""])[0].strip()
+            # No mood text: just pull the trending set from Prowlarr/Radarr/Sonarr
+            # and pick a high-scoring one randomly. We do this by searching
+            # Radarr+Sonarr for a broad term ("a") and filtering for runtime
+            # <180min + votes > 6.5, then random.sample from top 12.
+            import random
+            radarr_hits = _search_radarr(up, "the")[:20]
+            sonarr_hits = _search_sonarr(up, "the")[:20]
+            pool = []
+            for m in radarr_hits:
+                rating = (m.get("ratings", {}) or {}).get("imdb", {}).get("value", 0) or 0
+                if rating and rating >= 6.5 and (m.get("runtime") or 999) <= 180:
+                    pool.append({"kind":"movie","title":m.get("title"),"year":m.get("year"),"score":rating*10,"tmdbId":m.get("tmdbId"),"summary":m.get("overview","")[:200]})
+            for s in sonarr_hits:
+                rating = (s.get("ratings", {}) or {}).get("imdb", {}).get("value", 0) or 0
+                if rating and rating >= 6.5:
+                    pool.append({"kind":"series","title":s.get("title"),"year":s.get("year"),"score":rating*10,"tvdbId":s.get("tvdbId"),"summary":(s.get("overview","")[:200] if isinstance(s.get("overview"),str) else "")})
+            if user_id:
+                have = _jellyfin_user_library(up, user_id, exclude_played=True)
+                pool = [x for x in pool if int(x.get("tmdbId") or x.get("tvdbId") or 0) not in have]
+            if not pool: return self._json({"error":"no candidates"}, 404)
+            pick = random.choice(pool)
+            return self._json({"pick": pick})
 
         if u.path == "/" or u.path == "/index.html":
             snap = _status_snapshot(up)
             body = _status_html(snap)
-            body += '<form class="search-bar" method="GET" action="/search"><input id="q" name="q" placeholder="Search movies or shows..." autocomplete="off" autofocus><datalist id="suggest"></datalist><button>Search</button></form>'
+            # Profile picker (top-right corner)
+            users = _jellyfin_users(up)
+            if users:
+                opts = "".join(f'<option value="{u["Id"]}">{u["Name"]}{" (admin)" if u.get("IsAdministrator") else ""}</option>' for u in users)
+                body += f'<form method="GET" action="/" style="margin-bottom:1rem"><label style="color:#fbbf24">Profile: </label><select name="user" onchange="this.form.submit()" style="background:#1a1a25;color:#eee;border:1px solid #444;padding:.4rem .6rem;border-radius:.4rem"><option value="">(all users)</option>{opts}</select></form>'
+            user_id = (qs.get("user") or [""])[0].strip()
+            body += '<form class="search-bar" method="GET" action="/search">'
+            if user_id: body += f'<input type="hidden" name="user" value="{user_id}">'
+            body += '<input id="q" name="q" placeholder="Search movies or shows..." autocomplete="off" autofocus><datalist id="suggest"></datalist><button>Search</button></form>'
             try:
                 with open("/storage/config/starter-packs.json") as f:
                     packs = json.load(f)
@@ -412,11 +540,19 @@ class Handler(BaseHTTPRequestHandler):
                 items_html = "".join(f"<li>{t}</li>" for t in p.get("titles",[])[:10])
                 body += f'<form method="POST" action="/pack" class="pack"><h3>{p["name"]}</h3><p class="desc">{p.get("description","")}</p><ul>{items_html}</ul><input type="hidden" name="pack" value="{p["name"]}"><button>Add all to {p.get("theme","library")}</button></form>'
             body += "</div>"
-            body += '<h2>Tonight</h2><form class="search-bar" method="GET" action="/tonight"><input name="q" placeholder="I want something funny from the 90s, not too long..."><button>Find</button></form>'
+            body += '<h2>Tonight</h2>'
+            tonight_form = '<form class="search-bar" method="GET" action="/tonight">'
+            if user_id: tonight_form += f'<input type="hidden" name="user" value="{user_id}">'
+            tonight_form += '<input name="q" placeholder="I want something funny from the 90s, not too long..."><button>Find</button></form>'
+            tonight_form += '<form class="search-bar" method="GET" action="/random">'
+            if user_id: tonight_form += f'<input type="hidden" name="user" value="{user_id}">'
+            tonight_form += '<button style="background:#22c55e">🎲 Random Pick</button></form>'
+            body += tonight_form
             return self._render(_html(body))
 
         if u.path == "/search":
             term = (qs.get("q") or [""])[0].strip()
+            user_id = (qs.get("user") or [""])[0].strip()
             if not term: return self._render(_html("<p>empty search</p>"))
             m = _search_radarr(up, term)
             s = _search_sonarr(up, term)
@@ -430,12 +566,17 @@ class Handler(BaseHTTPRequestHandler):
                 for x in json.loads(body): sonarr_existing[x.get("tvdbId")] = x
             for x in m: x["__already"] = x.get("tmdbId") in radarr_existing
             for x in s: x["__already"] = x.get("tvdbId") in sonarr_existing
+            if user_id:
+                have = _jellyfin_user_library(up, user_id, exclude_played=False)
+                m, s = _apply_user_filter(m, s, have)
             cards = "".join(_card(x, "movie") for x in m) + "".join(_card(x, "series") for x in s)
+            user_param = f"&user={user_id}" if user_id else ""
             body = f'<p style="color:#999">Results for <b>{term}</b> &middot; <a href="/">back</a></p><div class="results">{cards}</div>' if (m or s) else f'<p>No results for <b>{term}</b>. <a href="/">back</a></p>'
             return self._render(_html(body))
 
         if u.path == "/tonight":
             q = (qs.get("q") or [""])[0].strip()
+            user_id = (qs.get("user") or [""])[0].strip()
             rec = _tonight(up, q) if q else {"results":[]}
             rows = ""
             for r in rec.get("results", []):
@@ -446,7 +587,35 @@ class Handler(BaseHTTPRequestHandler):
                 summary = r.get("summary","")[:200]
                 ellipsis = "..." if len(summary) >= 200 else ""
                 rows += f'<form class="tonight-result" method="POST" action="/add/{kind}"><div class="score">{r["score"]}</div><div style="flex:1"><b>{title}</b> ({year})<br><span style="color:#aaa">{summary}{ellipsis}</span></div><input type="hidden" name="id" value="{r.get(id_key)}"><button style="background:#22c55e;color:#fff;border:none;padding:.4rem .8rem;border-radius:.4rem;cursor:pointer">Add</button></form>'
-            body = f'<p style="color:#999">Tonight for: <b>{q}</b> &middot; <a href="/">back</a></p>' + (rows or "<p>No results</p>")
+            user_param = f" &middot; <a href=/random?user={user_id}>🎲 random pick for this profile</a>" if user_id else " &middot; <a href=/random>🎲 random pick</a>"
+            body = f'<p style="color:#999">Tonight for: <b>{q}</b>{user_param} &middot; <a href="/">back</a></p>' + (rows or "<p>No results</p>")
+            return self._render(_html(body))
+
+        if u.path == "/random":
+            user_id = (qs.get("user") or [""])[0].strip()
+            # Build a query string we can pass to /tonight (random picks get
+            # the same Tonight scoring, but with a random seed term).
+            import random as _r
+            seed = _r.choice(["the", "a", "new", "best", "top", "story", "man", "woman", "love", "night", "day"])
+            rec = _tonight(up, seed)
+            if user_id:
+                have = _jellyfin_user_library(up, user_id, exclude_played=True)
+                rec["movies"] = [m for m in rec.get("movies", []) if int(m.get("tmdbId") or 0) not in have]
+                rec["series"] = [s for s in rec.get("series", []) if int(s.get("tvdbId") or 0) not in have]
+            pool = rec.get("movies", []) + rec.get("series", [])
+            if not pool:
+                body = '<div class="toast error">No candidates right now — try adding more items to your library first.</div><a href="/">back</a>'
+                return self._render(_html(body))
+            r = _r.choice(pool)
+            kind = r["kind"]
+            id_key = "tmdbId" if kind == "movie" else "tvdbId"
+            summary = r.get("summary","")[:300]
+            body = f'''<div class="tonight-result" style="background:#1a1a25;border:1px solid #22c55e;border-radius:.6rem;padding:1rem;margin:1rem 0">
+<div class="score">{r["score"]}</div>
+<div style="flex:1"><b>{r["title"]}</b> ({r.get("year","")})<br><span style="color:#bbb">{summary}{"..." if len(summary)>=300 else ""}</span></div>
+<form method="POST" action="/add/{kind}" style="margin-left:1rem"><input type="hidden" name="id" value="{r.get(id_key)}"><button style="background:#22c55e;color:#fff;border:none;padding:.5rem 1rem;border-radius:.4rem;cursor:pointer;font-weight:600">Add to {kind}</button></form>
+</div>
+<p style="text-align:center;margin-top:1rem"><a href="/random{("?user="+user_id) if user_id else ""}" style="color:#fbbf24">🎲 Roll again</a> &middot; <a href="/" style="color:#fbbf24">back to home</a></p>'''
             return self._render(_html(body))
 
         self._send(404, "text/plain", "not found")

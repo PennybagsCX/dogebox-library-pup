@@ -4,7 +4,7 @@
 
 **One URL for your Dogebox media stack.** Unified search across movies + shows, one-click add, curated starter packs, IMDb/Trakt watchlist import, and a free-text "Tonight" recommender — all on top of the existing Radarr + Sonarr + Prowlarr + Jellyfin apps you already have.
 
-> **Latest:** v0.0.3 — ships all three planned versions: v0.0.1 unified search + starter packs + add, v0.0.2 IMDb watchlist import, v0.0.3 Tonight mood recommender (no external LLM, pure Python heuristic).
+> **Latest:** v0.0.5 — v0.0.3 features plus per-user profiles (filter out items each Jellyfin user has already in their library) and a 🎲 Random Pick button. Fixes a Jellyfin auth-header bug (was sending `X-Api-Key`; Jellyfin needs `X-Emby-Token`) and a crash on movies whose TMDB `genres` field comes back as a string instead of a list.
 
 ## Why
 
