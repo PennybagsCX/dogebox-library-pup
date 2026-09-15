@@ -1,0 +1,6 @@
+{
+  "id": "dts.pups.library",
+  "name": "dts — library",
+  "description": "Dogebox Library pup — unified search + one-click add across Radarr/Sonarr/Prowlarr/Jellyfin",
+  "pups": [{"location": "library"}]
+}
