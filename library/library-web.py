@@ -311,6 +311,85 @@ def _status_snapshot(up):
     except Exception: pass
     return snap
 
+# ----- archive.org fallback (bypasses Prowlarr when blocked) -----
+ARCHIVE_TORRENT_URL = "https://archive.org/download/{identifier}/{identifier}_archive.torrent"
+
+def _search_archive_org(title, year=None, limit=5):
+    """Search archive.org public API for a movie by title.
+    Returns list of dicts: {identifier, title, downloads}
+    """
+    import urllib.parse
+    query = title
+    if year:
+        query = f"{title} {year}"
+    q = urllib.parse.quote_plus(query)
+    url = (
+        f"https://archive.org/advancedsearch.php"
+        f"?q={q}+AND+mediatype%3Amovies"
+        f"&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=downloads"
+        f"&sort%5B%5D=downloads+desc&rows={limit}&output=json"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "dogebox-library/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            if r.status != 200:
+                return []
+            data = json.loads(r.read().decode("utf-8", errors="replace"))
+        return [
+            {"identifier": d.get("identifier", ""), "title": d.get("title", ""),
+             "downloads": d.get("downloads", 0)}
+            for d in data.get("response", {}).get("docs", [])
+            if d.get("identifier")
+        ]
+    except Exception:
+        return []
+
+def _add_to_qbittorrent(identifier, save_path=None, category=None):
+    """Download a torrent from archive.org and push it directly to qBittorrent.
+    Returns ("ok", None) on success or ("fail", error_message) on failure.
+    qBittorrent runs on the host at port 10005; from inside the pup container
+    it is reached at the host's bridge IP (discovered from GATEWAY env var).
+    """
+    import tempfile, subprocess, urllib.parse
+    # qBittorrent runs on the host at 10.0.0.98:10005 — reach it via the LAN bridge
+    qb_host = os.environ.get("GATEWAY", "10.0.0.98")
+    qb_url  = f"http://{qb_host}:10005"
+    torrent_url = ARCHIVE_TORRENT_URL.format(identifier=identifier)
+
+    # Download torrent to a temp file (use -L to follow redirects)
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".torrent", delete=False) as tf:
+            tmp = tf.name
+        proc = subprocess.run(
+            ["curl", "-L", "-s", "-o", tmp, torrent_url,
+             "--max-time", "20", "--user-agent", "dogebox-library/1.0"],
+            capture_output=True, timeout=25
+        )
+        size = os.path.getsize(tmp)
+        if size < 100:
+            os.unlink(tmp)
+            return "fail", f"torrent file too small ({size} bytes)"
+    except Exception as e:
+        return "fail", f"download failed: {e}"
+
+    # POST to qBittorrent via curl (simpler than email module)
+    try:
+        proc = subprocess.run(
+            ["curl", "-s", "-X", "POST",
+             f"{qb_url}/api/v2/torrents/add",
+             "-F", "torrents=@" + tmp],
+            capture_output=True, timeout=20
+        )
+        result = (proc.stdout or b"").decode("utf-8", errors="replace").strip()
+        os.unlink(tmp)
+        if result.lower() == "ok." or not result:
+            return "ok", None
+        else:
+            return "fail", f"qB: {result}"
+    except Exception as e:
+        os.unlink(tmp)
+        return "fail", f"qB POST failed: {e}"
+
 # ----- v0.0.5: per-user profiles -----
 # Jellyfin's /Users/<id>/Items returns everything the user has in their library
 # (across all libraries). For the "watched/unwatched" filter, we use
@@ -1571,7 +1650,16 @@ class Handler(BaseHTTPRequestHandler):
                 kind = pack.get("theme")
                 if kind == "movies":
                     res = _search_radarr(up, t)
-                    if res: results.append(("movie", res[0]))
+                    if res:
+                        results.append(("movie", res[0]))
+                    else:
+                        # Prowlarr/ archive.org blocked Radarr — try archive.org directly
+                        year = None
+                        hits = _search_archive_org(t, limit=3)
+                        if hits:
+                            top = hits[0]
+                            ok, err = _add_to_qbittorrent(top["identifier"])
+                            results.append(("movie-archive", {"title": t, "identifier": top["identifier"], "archive_downloads": top.get("downloads", 0), "qb_ok": ok, "qb_err": err}))
                 else:
                     res = _search_sonarr(up, t)
                     if res: results.append(("series", res[0]))
@@ -1579,15 +1667,18 @@ class Handler(BaseHTTPRequestHandler):
             for kind, item in results:
                 if kind == "movie":
                     r = _add_movie(up, item, _quality_id(up, "movie"))
+                    added.append((kind, item.get("title"), r.get("ok"), r.get("already")))
+                elif kind == "movie-archive":
+                    added.append((kind, item.get("title"), item.get("qb_ok") == "ok", False))
                 else:
                     r = _add_series(up, item, _quality_id(up, "series"))
-                added.append((kind, item.get("title"), r.get("ok"), r.get("already")))
+                    added.append((kind, item.get("title"), r.get("ok"), r.get("already")))
             rows = "".join(
-                f'<li>{"OK" if ok else ("SKIP" if already else "NO")} <b>{t}</b> ({k})</li>'
+                f'<li>{"OK" if ok else ("SKIP" if already else ("FAIL" if k == "movie-archive" else "NO"))} <b>{t}</b> ({k})</li>'
                 for k, t, ok, already in added
             )
             skipped = len(pack.get("titles",[])) - len(added)
-            body = f'<div class="toast-inline"><strong>Pack "{pack_name}":</strong> {sum(1 for _,_,ok,_ in added if ok)} added, {sum(1 for _,_,_,al in added if al)} already present, {skipped} not found.</div><ul>{rows}</ul><a href="/">back</a>'
+            body = f'<div class="toast-inline"><strong>Pack "{pack_name}":</strong> {sum(1 for _,_,ok,_ in added if ok)} added, {sum(1 for _,_,_,al in added if al)} already present, {sum(1 for k,_,ok,_ in added if k == "movie-archive" and not ok)} failed (archive.org), {skipped} not found.</div><ul>{rows}</ul><a href="/">back</a>'
             self._render(_html(body))
             return
 
