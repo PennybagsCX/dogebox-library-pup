@@ -357,76 +357,957 @@ def _apply_user_filter(movies, series, have_set):
     return movies, series
 
 CSS = """
-body{font-family:system-ui,Segoe UI,sans-serif;margin:0;background:#0f0f17;color:#eee;line-height:1.45}
-header{background:linear-gradient(90deg,#6d28d9,#8b5cf6);padding:1.5rem 2rem;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-header h1{margin:0;color:#fff;font-size:1.4rem}
-header .badge{background:rgba(255,255,255,.18);padding:.25rem .6rem;border-radius:1rem;color:#fff;font-size:.85rem;margin-left:1rem}
-main{max-width:1100px;margin:1.5rem auto;padding:0 1rem 4rem}
-h2{color:#fbbf24;border-bottom:1px solid #333;padding-bottom:.4rem}
-.search-bar{display:flex;gap:.5rem;margin-bottom:1rem}
-.search-bar input{flex:1;background:#1a1a25;color:#eee;border:1px solid #444;padding:.7rem 1rem;border-radius:.4rem;font-size:1rem}
-.search-bar button{background:#8b5cf6;color:#fff;border:none;padding:0 1.4rem;border-radius:.4rem;font-weight:600;cursor:pointer}
-.search-bar button:hover{background:#a78bfa}
-.results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:2rem}
-.card{background:#1a1a25;border:1px solid #2a2a35;border-radius:.6rem;padding:.8rem;display:flex;flex-direction:column;gap:.4rem}
-.card h3{margin:0;font-size:1rem;color:#fbbf24}
-.card .year{color:#999;font-size:.85rem}
-.card .summary{font-size:.85rem;color:#bbb;flex:1}
-.card form{margin-top:.5rem}
-.card button{background:#22c55e;color:#fff;border:none;padding:.4rem .8rem;border-radius:.4rem;cursor:pointer;width:100%;font-weight:600}
-.card button:hover{background:#16a34a}
-.card .already{background:#555;color:#fff;border:none;padding:.4rem .8rem;border-radius:.4rem;width:100%;cursor:not-allowed;opacity:0.7}
-.card img{width:100%;border-radius:.4rem}
-.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.pack{background:#1a1a25;border:1px solid #6d28d9;border-radius:.6rem;padding:1rem}
-.pack h3{margin:0 0 .4rem;color:#fbbf24}
-.pack .desc{font-size:.85rem;color:#999;margin-bottom:.5rem}
-.pack ul{padding-left:1.2rem;margin:.3rem 0;font-size:.85rem;color:#ccc;max-height:140px;overflow:auto}
-.pack form button{background:#6d28d9;color:#fff;border:none;padding:.5rem 1rem;border-radius:.4rem;cursor:pointer;font-weight:600}
-.pack form button:hover{background:#7c3aed}
-.status{background:#1a1a25;border:1px solid #333;border-radius:.6rem;padding:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;margin-bottom:1.5rem}
-.status div{text-align:center}
-.status div strong{display:block;font-size:1.4rem;color:#fbbf24}
-.tonight-result{display:flex;gap:.5rem;align-items:start;padding:.5rem 0;border-bottom:1px solid #2a2a35}
-.tonight-result .score{background:#8b5cf6;color:#fff;padding:.2rem .6rem;border-radius:.4rem;font-weight:600;min-width:60px;text-align:center}
-.toast{background:#22c55e;color:#fff;padding:1rem;border-radius:.4rem;margin:1rem 0}
-.toast.error{background:#dc2626}
+:root {
+  --color-bg-base: #0d0d14;
+  --color-bg-surface: #16161f;
+  --color-bg-elevated: #1e1e2a;
+  --color-bg-overlay: #252535;
+  --color-border: #2a2a3a;
+  --color-border-strong: #3d3d52;
+  --color-text-primary: #f0f0f5;
+  --color-text-secondary: #9090a8;
+  --color-text-muted: #5a5a70;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #fbbf24;
+  --color-accent-subtle: #78350f;
+  --color-success: #22c55e;
+  --color-success-subtle: #14532d;
+  --color-error: #ef4444;
+  --color-error-subtle: #7f1d1d;
+  --color-purple: #8b5cf6;
+  --color-purple-subtle: #4c1d95;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  margin: 0;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  font-size: 0.9rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Skip link */
+.skip { position: absolute; top: -40px; left: 0; background: var(--color-purple); color: #fff; padding: var(--space-2) var(--space-4); z-index: 200; border-radius: 0 0 var(--radius-md) 0; }
+.skip:focus { top: 0; }
+
+/* Topbar */
+.topbar {
+  background: linear-gradient(135deg, var(--color-bg-base) 0%, color-mix(in srgb, var(--color-purple) 8%, var(--color-bg-base)) 100%);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow-md);
+}
+.topbar-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.topbar-mark-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* User pill */
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+.user-pill:hover { border-color: var(--color-border-strong); }
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  background: var(--color-purple);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.user-pill .label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.user-pill select {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
+  padding-right: var(--space-2);
+}
+.user-pill select option { background: var(--color-bg-elevated); }
+
+/* Status dot */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--color-success);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--color-success);
+}
+.status-dot.degraded {
+  background: var(--color-accent);
+  box-shadow: 0 0 6px var(--color-accent);
+}
+.status-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-8);
+}
+
+/* Section */
+.section { margin-bottom: var(--space-6); }
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.section-aside {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+.section-aside a {
+  color: var(--color-purple);
+  text-decoration: none;
+}
+.section-aside a:hover { text-decoration: underline; }
+.section-aside .sep { color: var(--color-text-muted); margin: 0 0.25em; }
+
+/* Search bar */
+.search-bar {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.search-wrap {
+  flex: 1;
+  position: relative;
+}
+.search-bar input {
+  width: 100%;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 2px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  height: 52px;
+}
+.search-bar input::placeholder { color: var(--color-text-muted); }
+.search-bar input:focus {
+  border-color: var(--color-purple);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+.search-bar button {
+  background: var(--color-purple);
+  color: #fff;
+  border: none;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+.search-bar button:hover { background: #7c3aed; transform: translateY(-1px); }
+.search-bar button:active { transform: translateY(0); }
+
+/* Autocomplete dropdown */
+.suggestions {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  max-height: 420px;
+  overflow-y: auto;
+  display: none;
+}
+.suggestions.open { display: block; }
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--color-border);
+}
+.suggestion:last-child { border-bottom: none; }
+.suggestion:hover, .suggestion[aria-selected="true"] { background: var(--color-bg-overlay); }
+.suggestion .poster {
+  width: 32px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+.suggestion .kind {
+  background: var(--color-purple-subtle);
+  color: var(--color-text-primary);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.suggestion .year {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.suggestion span:not(.kind):not(.year) {
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions toolbar */
+.actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+  margin-bottom: var(--space-6);
+}
+.tonight-form {
+  flex: 1;
+  min-width: 280px;
+}
+.tonight-form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-2);
+}
+.tonight-form-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.tonight-form input {
+  flex: 1;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  height: 40px;
+}
+.tonight-form input:focus { border-color: var(--color-purple); }
+.tonight-form button, .random-pick-btn {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  height: 40px;
+}
+.tonight-form button:hover, .random-pick-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.random-pick-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.random-pick-btn .glyph {
+  font-size: 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.random-pick-btn.loading .glyph::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--color-text-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Status strip */
+.status-strip-grid {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.status-tile { text-align: center; }
+.status-tile strong {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.status-tile span {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Results grid */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+@media (min-width: 480px) { .results-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .results-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1024px) { .results-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Media card */
+.card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-border-strong);
+}
+.card-poster {
+  position: relative;
+  aspect-ratio: 2/3;
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+}
+.card-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+.card:hover .card-poster img { transform: scale(1.03); }
+.card-poster-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  background: linear-gradient(135deg, var(--color-bg-elevated), var(--color-bg-overlay));
+  letter-spacing: -0.05em;
+}
+.genre-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.genre-pill {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.card-body {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+.card-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.card-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.card-meta .dot { opacity: 0.4; }
+.card-overview {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.card-action { margin-top: auto; padding-top: var(--space-2); }
+.card-action button {
+  width: 100%;
+  background: var(--color-success);
+  color: #fff;
+  border: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.card-action button:hover { background: #16a34a; transform: scale(1.02); }
+.card-action button:active { transform: scale(0.98); }
+.card-action button.already {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Tonight results */
+.tonight-list { margin-bottom: var(--space-6); }
+.tonight-result {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+.tonight-result:last-child { border-bottom: none; }
+.tonight-result:hover { background: rgba(255,255,255,0.02); margin: 0 calc(-1 * var(--space-2)); padding-left: var(--space-2); padding-right: var(--space-2); border-radius: var(--radius-md); }
+.tonight-result .score-badge {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  flex-shrink: 0;
+  min-width: 52px;
+}
+.tonight-result .score-label {
+  display: block;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.tonight-result .info { flex: 1; min-width: 0; }
+.tonight-result .title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1);
+}
+.tonight-result .title span { font-weight: 400; color: var(--color-text-muted); }
+.tonight-result .summary {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tonight-result form { flex-shrink: 0; }
+.tonight-result button {
+  background: var(--color-success);
+  color: #fff;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.tonight-result button:hover { background: #16a34a; }
+
+/* Starter packs */
+.packs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.pack {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-left: 2px solid color-mix(in srgb, var(--color-purple) 40%, transparent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.pack:hover { border-left-color: var(--color-accent); box-shadow: var(--shadow-md); }
+.pack[data-theme="movies"] { border-left-color: var(--color-purple); }
+.pack[data-theme="shows"] { border-left-color: #3b82f6; }
+.pack[data-theme="mixed"] { border-left-color: var(--color-accent); }
+.pack-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+}
+.pack-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3);
+  line-height: 1.5;
+}
+.pack-count {
+  display: inline-block;
+  background: var(--color-purple-subtle);
+  color: var(--color-purple);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
+}
+.pack-titles {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  max-height: 130px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.pack-titles li {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.pack-titles li:last-child { border-bottom: none; }
+.pack-titles li em { color: var(--color-text-muted); font-size: 0.75rem; }
+.pack button {
+  background: var(--color-purple);
+  color: #fff;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  width: 100%;
+}
+.pack button:hover { background: #7c3aed; transform: translateY(-1px); }
+
+/* Toast inline */
+.toast-inline {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-success);
+  border-left: 2px solid color-mix(in srgb, var(--color-success) 60%, transparent);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-md);
+  font-size: 0.875rem;
+  margin: var(--space-4) 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.toast-inline::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/%3E%3Cpolyline points='22 4 12 14.01 9 11.01'/%3E%3C/svg%3E") center/contain no-repeat;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.toast-inline.error {
+  border-left-color: var(--color-error);
+  border-color: var(--color-error-subtle);
+}
+.toast-inline.error::before {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='15' y1='9' x2='9' y2='15'/%3E%3Cline x1='9' y1='9' x2='15' y2='15'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.toast-inline strong { display: block; font-weight: 600; color: var(--color-text-primary); margin-bottom: var(--space-1); }
+.toast-inline p { margin: 0; color: var(--color-text-secondary); }
+.toast-inline ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); color: var(--color-text-secondary); }
+.toast-inline li { margin-bottom: var(--space-1); }
+
+/* Toast region (for JS-driven toasts) */
+.toast-region { position: fixed; top: var(--space-4); left: 50%; transform: translateX(-50%); z-index: 1000; pointer-events: none; }
+.toast {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--space-2);
+  min-width: 300px;
+  max-width: 440px;
+  pointer-events: auto;
+  animation: toast-in var(--transition-slow) forwards;
+}
+.toast.success { border-left: 2px solid color-mix(in srgb, var(--color-success) 60%, transparent); }
+.toast.error { border-left: 2px solid color-mix(in srgb, var(--color-error) 60%, transparent); }
+.toast.info { border-left: 2px solid color-mix(in srgb, var(--color-purple) 60%, transparent); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-8px); }
+}
+.toast.fade-out { animation: toast-out var(--transition-normal) forwards; }
+
+/* Empty state */
+.empty {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  color: var(--color-text-muted);
+}
+.empty strong { display: block; font-size: 1.1rem; color: var(--color-text-secondary); margin-bottom: var(--space-2); }
+.empty p { margin: 0; font-size: 0.875rem; }
+.empty svg { width: 64px; height: 64px; margin-bottom: var(--space-4); opacity: 0.3; }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .topbar { padding: var(--space-3); }
+  .topbar .label { display: none; }
+  .search-bar input { font-size: 0.9rem; height: 46px; }
+  .actions-toolbar { flex-direction: column; align-items: stretch; }
+  .tonight-form { min-width: unset; }
+  .tonight-result { flex-wrap: wrap; }
+  .tonight-result .score-badge { order: -1; }
+  .tonight-result form { width: 100%; }
+  .tonight-result button { width: 100%; margin-top: var(--space-2); }
+  .section-head { flex-direction: column; gap: var(--space-1); }
+}
 """
 
-def _html(body, title="Library"):
-    return f"""<!doctype html>
-<html><head><meta charset="utf-8"><title>{title}</title><style>{CSS}</style></head>
-<body><header><h1>📚 Dogebox Library <span class="badge">v0.0.3</span></h1></header>
-<main>{body}</main>
-<script src="/static/live.js"></script>
-</body></html>"""
+def _initials(name):
+    parts = [p for p in (name or "").strip().split() if p]
+    if not parts: return "?"
+    if len(parts) == 1: return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
 
-def _card(item, kind):
+def _render_topbar(up, user_id, status_reachable):
+    users = _jellyfin_users(up)
+    pill = ""
+    if users:
+        opts = []
+        sel = ""
+        for u in users:
+            name = u["Name"]
+            admin = u.get("IsAdministrator", False)
+            opts.append(f'<option value="{u["Id"]}" {"selected" if str(u["Id"])==user_id else ""}>{name}{" (admin)" if admin else ""}</option>')
+            if str(u["Id"]) == user_id: sel = name
+        current_label = sel if sel else "(all users)"
+        pill = (
+            f'<label class="user-pill" title="Filter by Jellyfin user">'
+            f'<span class="user-avatar">{_initials(current_label)}</span>'
+            f'<span class="label">{_initials(current_label)}</span>'
+            f'<form method="GET" action="/" style="margin:0;display:inline">'
+            f'<select name="user" onchange="this.form.submit()" aria-label="Profile">'
+            f'<option value="">(all users)</option>' + "".join(opts) +
+            f'</select></form></label>'
+        )
+    dot = '<span class="status-dot" title="All upstreams reachable"></span>' if status_reachable else '<span class="status-dot degraded" title="One or more upstreams unreachable"></span>'
+    svg_icon = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" '
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>'
+        '<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'
+        '</svg>'
+    )
+    return (
+        f'<a class="topbar-mark" href="/"><span class="topbar-mark-glyph" aria-hidden="true">{svg_icon}</span><span>Library</span></a>'
+        f'<div class="topbar-right">{pill}<span class="status-strip" aria-label="Upstream status">{dot}<span class="label">upstreams</span></span></div>'
+    )
+
+def _render_search_bar(user_id):
+    hidden = f'<input type="hidden" name="user" value="{user_id}">' if user_id else ""
+    return (
+        f'<form class="search-bar" method="GET" action="/search">'
+        f'{hidden}'
+        f'<div class="search-wrap">'
+        f'<input id="q" name="q" placeholder="Search movies or shows..." autocomplete="off" autofocus spellcheck="false" aria-label="Search">'
+        f'<div class="suggestions" id="suggest" role="listbox" aria-label="Search suggestions"></div>'
+        f'</div>'
+        f'<button type="submit">Search</button>'
+        f'</form>'
+    )
+
+def _render_actions_toolbar(user_id):
+    hidden = f'<input type="hidden" name="user" value="{user_id}">' if user_id else ""
+    rand_query = f'<input type="hidden" name="user" value="{user_id}">' if user_id else ""
+    return (
+        f'<div class="actions-toolbar">'
+        f'<form class="tonight-form" method="GET" action="/tonight">'
+        f'{hidden}'
+        f'<label class="tonight-form-label" for="tonight-q">Tonight</label>'
+        f'<div class="tonight-form-row">'
+        f'<input id="tonight-q" name="q" aria-label="Tonight mood input" placeholder="Mood, genre, year - \\"funny 90s not too long\\"" autocomplete="off" spellcheck="false">'
+        f'<button type="submit">Find</button>'
+        f'</div></form>'
+        f'<form method="GET" action="/random">'
+        f'{rand_query}'
+        f'<button type="submit" class="random-pick-btn" id="random-pick-btn" title="Surprise me">'
+        f'<span class="glyph" aria-hidden="true"></span><span>Surprise me</span>'
+        f'</button></form>'
+        f'</div>'
+    )
+
+def _render_card(item, kind):
     title = item.get("title") or "?"
     year = item.get("year") or "?"
     runtime = item.get("runtime")
-    overview = item.get("overview") or item.get("summary") or ""
+    overview = (item.get("overview") or item.get("summary") or "").replace("<","&lt;")
     poster = item.get("remotePoster") or ""
-    tmdb = item.get("tmdbId")
-    tvdb = item.get("tvdbId")
     already = item.get("__already") or False
+    genres = (_genres(item) or [])[:2]
     id_key = "tmdbId" if kind == "movie" else "tvdbId"
-    id_val = tmdb if kind == "movie" else tvdb
-    poster_html = f'<img src="{poster}" alt="" loading="lazy">' if poster else ""
-    runtime_html = f'<span class="year">{runtime} min</span>' if runtime else ""
+    id_val = item.get(id_key) or ""
+    poster_html = f'<img src="{poster}" alt="" loading="lazy" decoding="async">' if poster else f'<div class="card-poster-placeholder">{title[:2]}</div>'
+    runtime_html = f' - {runtime} min' if runtime else ''
     ellipsis = "..." if len(overview) > 200 else ""
-    action = f'<form method="POST" action="/add/{kind}"><input type="hidden" name="id" value="{id_val}"><button>Add to {kind.title()}</button></form>' if not already else f'<button class="already" disabled>Already in library</button>'
-    return f'<div class="card">{poster_html}<h3>{title}</h3><span class="year">{year}</span> {runtime_html}<p class="summary">{overview[:200]}{ellipsis}</p>{action}</div>'
+    genre_html = ""
+    if genres:
+        pills = "".join(f'<span class="genre-pill">{g}</span>' for g in genres)
+        genre_html = f'<div class="genre-pills">{pills}</div>'
+    if already:
+        action = f'<div class="card-action"><button class="already" type="button" disabled>Already in library</button></div>'
+    else:
+        action = f'<form class="card-action" method="POST" action="/add/{kind}"><input type="hidden" name="id" value="{id_val}"><button type="submit">Add to {kind.capitalize()}</button></form>'
+    return (
+        f'<article class="card">'
+        f'<div class="card-poster">{poster_html}</div>'
+        f'<div class="card-body">'
+        f'<h3 class="card-title" title="{title}">{title}</h3>'
+        f'<div class="card-meta"><span class="card-meta-year">{year}</span>{runtime_html}</div>'
+        f'{genre_html}'
+        f'<p class="card-overview">{overview[:200]}{ellipsis}</p>'
+        f'</div>'
+        f'{action}'
+        f'</article>'
+    )
 
-def _status_html(snap):
-    items = [
-        ("Movies", snap.get("movies_count","?")),
-        ("Shows", snap.get("series_count","?")),
-        ("JF users", snap.get("jf_users","?")),
-        ("Prowlarr indexers", f"{snap.get('prowlarr_indexers_enabled','?')}/{snap.get('prowlarr_indexers_total','?')}"),
-    ]
-    cells = "".join(f'<div>{k}<strong>{v}</strong></div>' for k,v in items)
-    return f'<div class="status">{cells}</div>'
+def _render_pack(p):
+    name = p.get("name","?")
+    name_esc = name.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+    desc = p.get("description","").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    titles = p.get("titles",[])[:8]
+    more = len(p.get("titles",[])) - len(titles)
+    items_html = "".join(f"<li>{t.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')}</li>" for t in titles)
+    if more > 0: items_html += f"<li><em>+{more} more...</em></li>"
+    theme = p.get("theme","library")
+    count = len(p.get("titles",[]))
+    return (
+        f'<article class="pack" data-theme="{theme}">'
+        f'<h3 class="pack-title">{name_esc}</h3>'
+        f'<p class="pack-desc">{desc}</p>'
+        f'<span class="pack-count">{count} titles</span>'
+        f'<ul class="pack-titles">{items_html}</ul>'
+        f'<form method="POST" action="/pack"><input type="hidden" name="pack" value="{name_esc}"><button type="submit">Add all to {theme}</button></form>'
+        f'</article>'
+    )
+
+def _render_status_strip(snap):
+    mc = snap.get("movies_count", "?")
+    sc = snap.get("series_count", "?")
+    jf = snap.get("jf_users", "?")
+    pi = snap.get("prowlarr_indexers_enabled", "?")
+    return (
+        f'<div class="status-strip-grid">'
+        f'<div class="status-tile"><strong class="status-tile__num">{mc}</strong><span class="status-tile__label">Movies</span></div>'
+        f'<div class="status-tile"><strong class="status-tile__num">{sc}</strong><span class="status-tile__label">Shows</span></div>'
+        f'<div class="status-tile"><strong class="status-tile__num">{jf}</strong><span class="status-tile__label">JF Users</span></div>'
+        f'<div class="status-tile"><strong class="status-tile__num">{pi}</strong><span class="status-tile__label">Indexers</span></div>'
+        f'</div>'
+    )
+
+def _render_empty(title, hint):
+    return f'<div class="empty"><strong>{title}</strong>{hint}</div>'
+
+def _render_results(movies, series):
+    if not (movies or series):
+        return _render_empty("No results yet", "Try a different term, or pick a starter pack below.")
+    cards = "".join(_render_card(x, "movie") for x in movies) + "".join(_render_card(x, "series") for x in series)
+    return f'<div class="results-grid">{cards}</div>'
+
+def _render_tonight_results(results):
+    if not results:
+        return _render_empty("No matches", "Tell me your mood - e.g. \"dark sci-fi under 2h\" or \"funny 90s\".")
+    rows = []
+    for r in results:
+        kind = r["kind"]; id_key = "tmdbId" if kind == "movie" else "tvdbId"
+        title = r["title"]; year = r.get("year","")
+        summary = (r.get("summary","") or "").replace("<","&lt;")
+        ellipsis = "..." if len(summary) >= 200 else ""
+        genres = (_genres(r) or [])[:3]
+        genre_html = ""
+        if genres:
+            pills = "".join(f'<span class="genre-pill">{g}</span>' for g in genres)
+            genre_html = f'<div class="tonight-result__genres">{pills}</div>'
+        rows.append(
+            f'<article class="tonight-result">'
+            f'<div class="tonight-result__score">'
+            f'<div class="score-badge">{r["score"]}</div>'
+            f'</div>'
+            f'<div class="tonight-result__info">'
+            f'<h4 class="tonight-result__title">{title} <span>({year})</span></h4>'
+            f'{genre_html}'
+            f'<p class="tonight-result__summary">{summary}{ellipsis}</p>'
+            f'</div>'
+            f'<div class="tonight-result__action">'
+            f'<form method="POST" action="/add/{kind}"><input type="hidden" name="id" value="{r.get(id_key)}"><button type="submit">Add</button></form>'
+            f'</div>'
+            f'</article>'
+        )
+    return f'<div class="tonight-list">{"".join(rows)}</div>'
+
+def _render_packs(packs):
+    if not packs:
+        return _render_empty("No starter packs", "Starter packs live at <code>/storage/config/starter-packs.json</code> on the box.")
+    return f'<div class="packs-grid">{"".join(_render_pack(p) for p in packs)}</div>'
+
+def _html(body, title="Library", up=None, user_id="", status_reachable=True):
+    if up is None: up = _load_upstreams()
+    head = (
+        f'<!doctype html>'
+        f'<html lang="en">'
+        f'<head>'
+        f'<meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+        f'<meta name="color-scheme" content="dark">'
+        f'<meta name="theme-color" content="#0d0d14">'
+        f'<title>{title}</title>'
+        f'<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23f59e0b\'><path d=\'M4 4v16l8-5 8 5V4z\'/></svg>">'
+        f'<style>{CSS}</style>'
+        f'</head>'
+        f'<body>'
+        f'<a class="skip" href="#main">Skip to content</a>'
+        f'<header class="topbar" role="banner">{_render_topbar(up, user_id, status_reachable)}</header>'
+        f'<main id="main" class="container" role="main">{body}</main>'
+        f'<div class="toast-region" role="region" aria-live="polite" id="toast-region"></div>'
+        f'<script src="/static/live.js" defer></script>'
+        f'</body></html>'
+    )
+    return head
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs): pass
@@ -449,6 +1330,7 @@ class Handler(BaseHTTPRequestHandler):
         up = _load_upstreams()
         u = urlparse(self.path)
         qs = parse_qs(u.query)
+        user_id = (qs.get("user") or [""])[0].strip()
 
         if u.path == "/static/live.js":
             self._send(200, "application/javascript", LIVE_JS)
@@ -519,82 +1401,71 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"pick": pick})
 
         if u.path == "/" or u.path == "/index.html":
-            snap = _status_snapshot(up)
-            body = _status_html(snap)
-            # Profile picker (top-right corner)
-            users = _jellyfin_users(up)
-            if users:
-                opts = "".join(f'<option value="{u["Id"]}">{u["Name"]}{" (admin)" if u.get("IsAdministrator") else ""}</option>' for u in users)
-                body += f'<form method="GET" action="/" style="margin-bottom:1rem"><label style="color:#fbbf24">Profile: </label><select name="user" onchange="this.form.submit()" style="background:#1a1a25;color:#eee;border:1px solid #444;padding:.4rem .6rem;border-radius:.4rem"><option value="">(all users)</option>{opts}</select></form>'
             user_id = (qs.get("user") or [""])[0].strip()
-            body += '<form class="search-bar" method="GET" action="/search">'
-            if user_id: body += f'<input type="hidden" name="user" value="{user_id}">'
-            body += '<input id="q" name="q" placeholder="Search movies or shows..." autocomplete="off" autofocus><datalist id="suggest"></datalist><button>Search</button></form>'
+            snap = _status_snapshot(up)
+            # Use upstreams-reachability for the status dot
+            reachable = (
+                isinstance(snap.get("movies_count"), int)
+                and isinstance(snap.get("series_count"), int)
+                and isinstance(snap.get("jf_users"), int)
+            )
             try:
                 with open("/storage/config/starter-packs.json") as f:
                     packs = json.load(f)
             except Exception:
                 packs = []
-            body += '<h2>Starter Packs</h2><div class="packs">'
-            for p in packs:
-                items_html = "".join(f"<li>{t}</li>" for t in p.get("titles",[])[:10])
-                body += f'<form method="POST" action="/pack" class="pack"><h3>{p["name"]}</h3><p class="desc">{p.get("description","")}</p><ul>{items_html}</ul><input type="hidden" name="pack" value="{p["name"]}"><button>Add all to {p.get("theme","library")}</button></form>'
-            body += "</div>"
-            body += '<h2>Tonight</h2>'
-            tonight_form = '<form class="search-bar" method="GET" action="/tonight">'
-            if user_id: tonight_form += f'<input type="hidden" name="user" value="{user_id}">'
-            tonight_form += '<input name="q" placeholder="I want something funny from the 90s, not too long..."><button>Find</button></form>'
-            tonight_form += '<form class="search-bar" method="GET" action="/random">'
-            if user_id: tonight_form += f'<input type="hidden" name="user" value="{user_id}">'
-            tonight_form += '<button style="background:#22c55e">🎲 Random Pick</button></form>'
-            body += tonight_form
-            return self._render(_html(body))
+            body = ""
+            body += _render_search_bar(user_id)
+            body += _render_status_strip(snap)
+            body += _render_actions_toolbar(user_id)
+            body += '<div class="section"><div class="section-head"><h2 class="section-title">Starter packs</h2>'
+            n_titles = sum(len(p.get("titles",[])) for p in packs)
+            body += f'<span class="section-aside">{len(packs)} packs - {n_titles} titles</span></div>'
+            body += _render_packs(packs) + '</div>'
+            return self._render(_html(body, up=up, user_id=user_id, status_reachable=reachable))
 
         if u.path == "/search":
             term = (qs.get("q") or [""])[0].strip()
             user_id = (qs.get("user") or [""])[0].strip()
-            if not term: return self._render(_html("<p>empty search</p>"))
+            if not term:
+                return self._render(_html('<div class="empty"><strong>Empty search</strong>Type something above and try again.</div>', up=up, user_id=user_id, title="Search - Dogebox Library"))
             m = _search_radarr(up, term)
             s = _search_sonarr(up, term)
             radarr_existing = {}
-            code, body = _api_get(up["radarr"]["url"], up["radarr"]["key"], "/api/v3/movie")
+            code, body_resp = _api_get(up["radarr"]["url"], up["radarr"]["key"], "/api/v3/movie")
             if code == 200:
-                for x in json.loads(body): radarr_existing[x.get("tmdbId")] = x
+                for x in json.loads(body_resp): radarr_existing[x.get("tmdbId")] = x
             sonarr_existing = {}
-            code, body = _api_get(up["sonarr"]["url"], up["sonarr"]["key"], "/api/v3/series")
+            code, body_resp = _api_get(up["sonarr"]["url"], up["sonarr"]["key"], "/api/v3/series")
             if code == 200:
-                for x in json.loads(body): sonarr_existing[x.get("tvdbId")] = x
+                for x in json.loads(body_resp): sonarr_existing[x.get("tvdbId")] = x
             for x in m: x["__already"] = x.get("tmdbId") in radarr_existing
             for x in s: x["__already"] = x.get("tvdbId") in sonarr_existing
             if user_id:
                 have = _jellyfin_user_library(up, user_id, exclude_played=False)
                 m, s = _apply_user_filter(m, s, have)
-            cards = "".join(_card(x, "movie") for x in m) + "".join(_card(x, "series") for x in s)
             user_param = f"&user={user_id}" if user_id else ""
-            body = f'<p style="color:#999">Results for <b>{term}</b> &middot; <a href="/">back</a></p><div class="results">{cards}</div>' if (m or s) else f'<p>No results for <b>{term}</b>. <a href="/">back</a></p>'
-            return self._render(_html(body))
+            _back_href = f'/?user={user_id}' if user_id else '/'
+            heading = f'<div class="section"><div class="section-head"><h2 class="section-title">Results for {chr(34)}{term.replace(chr(60),"&lt;")}{chr(34)}</h2><span class="section-aside"><a href="{_back_href}">back</a></span></div>'
+            grid = _render_results(m, s)
+            return self._render(_html(heading + grid, up=up, user_id=user_id, title=f"Search: {term} - Library"))
 
         if u.path == "/tonight":
             q = (qs.get("q") or [""])[0].strip()
             user_id = (qs.get("user") or [""])[0].strip()
             rec = _tonight(up, q) if q else {"results":[]}
-            rows = ""
-            for r in rec.get("results", []):
-                kind = r["kind"]
-                id_key = "tmdbId" if kind == "movie" else "tvdbId"
-                title = r["title"]
-                year = r.get("year","")
-                summary = r.get("summary","")[:200]
-                ellipsis = "..." if len(summary) >= 200 else ""
-                rows += f'<form class="tonight-result" method="POST" action="/add/{kind}"><div class="score">{r["score"]}</div><div style="flex:1"><b>{title}</b> ({year})<br><span style="color:#aaa">{summary}{ellipsis}</span></div><input type="hidden" name="id" value="{r.get(id_key)}"><button style="background:#22c55e;color:#fff;border:none;padding:.4rem .8rem;border-radius:.4rem;cursor:pointer">Add</button></form>'
-            user_param = f" &middot; <a href=/random?user={user_id}>🎲 random pick for this profile</a>" if user_id else " &middot; <a href=/random>🎲 random pick</a>"
-            body = f'<p style="color:#999">Tonight for: <b>{q}</b>{user_param} &middot; <a href="/">back</a></p>' + (rows or "<p>No results</p>")
-            return self._render(_html(body))
+            user_param = f"&user={user_id}" if user_id else ""
+            _tonight_back = f'/?user={user_id}' if user_id else '/'
+            head = (
+                f'<div class="section"><div class="section-head">'
+                f'<h2 class="section-title">Tonight for {chr(34)}{(q or "").replace(chr(60),"&lt;")}{chr(34)}</h2>'
+                f'<span class="section-aside"><a href="/tonight?q=&user={user_id}">reroll</a> <span class="sep">|</span> <a href="{_tonight_back}">back</a></span>'
+                f'</div>'
+            )
+            return self._render(_html(head + _render_tonight_results(rec.get("results", [])), up=up, user_id=user_id, title="Tonight - Library"))
 
         if u.path == "/random":
-            user_id = (qs.get("user") or [""])[0].strip()
-            # Build a query string we can pass to /tonight (random picks get
-            # the same Tonight scoring, but with a random seed term).
+            _tonight_back = f'/?user={user_id}' if user_id else '/'
             import random as _r
             seed = _r.choice(["the", "a", "new", "best", "top", "story", "man", "woman", "love", "night", "day"])
             rec = _tonight(up, seed)
@@ -604,19 +1475,39 @@ class Handler(BaseHTTPRequestHandler):
                 rec["series"] = [s for s in rec.get("series", []) if int(s.get("tvdbId") or 0) not in have]
             pool = rec.get("movies", []) + rec.get("series", [])
             if not pool:
-                body = '<div class="toast error">No candidates right now — try adding more items to your library first.</div><a href="/">back</a>'
-                return self._render(_html(body))
-            r = _r.choice(pool)
-            kind = r["kind"]
+                return self._render(_html(_render_empty("No candidates yet", "Add a few titles first, or check your Prowlarr indexers."), up=up, user_id=user_id, title="Random - Library"))
+            pick = _r.choice(pool)
+            kind = pick["kind"]
             id_key = "tmdbId" if kind == "movie" else "tvdbId"
-            summary = r.get("summary","")[:300]
-            body = f'''<div class="tonight-result" style="background:#1a1a25;border:1px solid #22c55e;border-radius:.6rem;padding:1rem;margin:1rem 0">
-<div class="score">{r["score"]}</div>
-<div style="flex:1"><b>{r["title"]}</b> ({r.get("year","")})<br><span style="color:#bbb">{summary}{"..." if len(summary)>=300 else ""}</span></div>
-<form method="POST" action="/add/{kind}" style="margin-left:1rem"><input type="hidden" name="id" value="{r.get(id_key)}"><button style="background:#22c55e;color:#fff;border:none;padding:.5rem 1rem;border-radius:.4rem;cursor:pointer;font-weight:600">Add to {kind}</button></form>
-</div>
-<p style="text-align:center;margin-top:1rem"><a href="/random{("?user="+user_id) if user_id else ""}" style="color:#fbbf24">🎲 Roll again</a> &middot; <a href="/" style="color:#fbbf24">back to home</a></p>'''
-            return self._render(_html(body))
+            title = pick["title"]; year = pick.get("year",""); score = pick["score"]
+            summary = (pick.get("summary","") or "").replace(chr(60),"&lt;")
+            ellipsis = "..." if len(summary) >= 200 else ""
+            rand_link = f'/random{("?user="+user_id) if user_id else ""}'
+            head = (
+                f'<div class="section"><div class="section-head">'
+                f'<h2 class="section-title">Surprise pick</h2>'
+                f'<span class="section-aside"><a href="{rand_link}">reroll</a> <span class="sep">|</span> <a href="{_tonight_back}">back</a></span>'
+                f'</div>'
+            )
+            body = head + _render_tonight_results([pick])
+            return self._render(_html(body, up=up, user_id=user_id, title="Random - Library"))
+
+        if u.path == "/import":
+            page_body = (
+                '<div class="section"><div class="section-head">'
+                '<h2 class="section-title">Import from IMDb</h2>'
+                '<span class="section-aside"><a href="/">back</a></span>'
+                '</div>'
+                '<div class="import-form-wrap">'
+                '<p style="color:var(--color-text-secondary);margin:0 0 1rem;font-size:0.9rem;">Paste an IMDb list export link to bulk-add titles. Go to an IMDb list, click Export, and copy the link.</p>'
+                '<form method="POST" action="/import" class="import-form">'
+                '<div class="import-form-row">'
+                '<input name="url" type="url" placeholder="https://www.imdb.com/list/ls.../export" autocomplete="off" spellcheck="false" aria-label="IMDb list export URL" style="flex:1;background:var(--color-bg-surface);color:var(--color-text-primary);border:1px solid var(--color-border);padding:0.5rem 1rem;border-radius:0.5rem;font-size:0.9rem;outline:none;">'
+                '<button type="submit" style="background:var(--color-purple);color:#fff;border:none;padding:0.5rem 1.5rem;border-radius:0.5rem;font-weight:600;font-size:0.9rem;cursor:pointer;white-space:nowrap;">Import</button>'
+                '</div></form></div>'
+            )
+            return self._render(_html(page_body, up=up, user_id=user_id, title="Import - Library"))
+
 
         self._send(404, "text/plain", "not found")
 
@@ -631,36 +1522,36 @@ class Handler(BaseHTTPRequestHandler):
             tmdb_id = int(form.get("id", ["0"])[0])
             code, body = _api_get(up["radarr"]["url"], up["radarr"]["key"], "/api/v3/movie/lookup", {"term": f"tmdb:{tmdb_id}"})
             if code != 200 or not json.loads(body):
-                self._render(_html('<div class="toast error">Movie lookup failed</div><a href="/">back</a>'))
+                self._render(_html('<div class="toast-inline error"><strong>Movie lookup failed.</strong>Try a different item.</div><a href="/">back</a>'))
                 return
             item = json.loads(body)[0]
             r = _add_movie(up, item, _quality_id(up, "movie"))
-            cls = "toast" if r.get("ok") else "toast error"
+            cls = "toast-inline" if r.get("ok") else "toast-inline error"
             if r.get("already"):
                 msg = "Already in your library."
             elif r.get("ok"):
                 msg = "Added! Radarr will search for it and qB will pick it up."
             else:
                 msg = f"Radarr returned {r.get('code')}: {r.get('body')}"
-            self._render(_html(f'<div class="{cls}">{msg}</div><a href="/">back to library</a>'))
+            self._render(_html(f'<div class="{cls}"><strong>{("Done" if r.get("ok") else "Failed")}.</strong> {msg}</div><a href="/">back to library</a>'))
             return
 
         if u.path.startswith("/add/series/"):
             tvdb_id = int(form.get("id", ["0"])[0])
             code, body = _api_get(up["sonarr"]["url"], up["sonarr"]["key"], "/api/v3/series/lookup", {"term": f"tvdb:{tvdb_id}"})
             if code != 200 or not json.loads(body):
-                self._render(_html('<div class="toast error">Series lookup failed</div><a href="/">back</a>'))
+                self._render(_html('<div class="toast-inline error"><strong>Series lookup failed.</strong>Try a different item.</div><a href="/">back</a>'))
                 return
             item = json.loads(body)[0]
             r = _add_series(up, item, _quality_id(up, "series"))
-            cls = "toast" if r.get("ok") else "toast error"
+            cls = "toast-inline" if r.get("ok") else "toast-inline error"
             if r.get("already"):
                 msg = "Already in your library."
             elif r.get("ok"):
                 msg = "Added! Sonarr will search for it."
             else:
                 msg = f"Sonarr returned {r.get('code')}: {r.get('body')}"
-            self._render(_html(f'<div class="{cls}">{msg}</div><a href="/">back to library</a>'))
+            self._render(_html(f'<div class="{cls}"><strong>{("Done" if r.get("ok") else "Failed")}.</strong> {msg}</div><a href="/">back to library</a>'))
             return
 
         if u.path == "/pack":
@@ -669,11 +1560,11 @@ class Handler(BaseHTTPRequestHandler):
                 with open("/storage/config/starter-packs.json") as f:
                     packs = json.load(f)
             except Exception as e:
-                self._render(_html(f'<div class="toast error">Pack file unreadable: {e}</div><a href="/">back</a>'))
+                self._render(_html(f'<div class="toast-inline error"><strong>Pack file unreadable:</strong> {e}</div><a href="/">back</a>'))
                 return
             pack = next((p for p in packs if p.get("name") == pack_name), None)
             if not pack:
-                self._render(_html('<div class="toast error">Pack not found</div><a href="/">back</a>'))
+                self._render(_html('<div class="toast-inline error"><strong>Pack not found.</strong> Check the pack name.</div><a href="/">back</a>'))
                 return
             results = []
             for t in pack.get("titles", []):
@@ -696,13 +1587,13 @@ class Handler(BaseHTTPRequestHandler):
                 for k, t, ok, already in added
             )
             skipped = len(pack.get("titles",[])) - len(added)
-            body = f'<div class="toast">Pack <b>{pack_name}</b>: {sum(1 for _,_,ok,_ in added if ok)} added, {sum(1 for _,_,_,al in added if al)} already present, {skipped} not found.</div><ul>{rows}</ul><a href="/">back</a>'
+            body = f'<div class="toast-inline"><strong>Pack "{pack_name}":</strong> {sum(1 for _,_,ok,_ in added if ok)} added, {sum(1 for _,_,_,al in added if al)} already present, {skipped} not found.</div><ul>{rows}</ul><a href="/">back</a>'
             self._render(_html(body))
             return
 
         if u.path == "/import":
             url = form.get("url", [""])[0].strip()
-            if not url: self._render(_html('<div class="toast error">no url</div><a href="/">back</a>')); return
+            if not url: self._render(_html('<div class="toast-inline error"><strong>Missing URL.</strong> Paste an IMDb list export link.</div><a href="/">back</a>')); return
             req = urllib.request.Request(url, headers={"User-Agent": "dogebox-library/0.0.3"})
             try:
                 with urllib.request.urlopen(req, timeout=10) as r:
@@ -711,13 +1602,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 code = 0; body = str(e)
             if code != 200:
-                self._render(_html(f'<div class="toast error">Fetch failed: HTTP {code}</div><a href="/">back</a>')); return
+                self._render(_html(f'<div class="toast-inline error"><strong>Fetch failed:</strong> HTTP {code}</div><a href="/">back</a>')); return
             if "imdb.com" in url and (body.lower().startswith("position") or "\t" in body):
                 res = _import_imdb_csv(up, body, _quality_id(up, "movie"))
                 rows = "".join(f"<li>{'OK' if r['added'] else 'NO'} <b>{r['title'] or r['input']}</b> ({r['kind']})</li>" for r in res)
-                body_html = f'<div class="toast">Imported {sum(1 for r in res if r["added"])}/{len(res)} from IMDb list.</div><ul>{rows}</ul><a href="/">back</a>'
+                body_html = f'<div class="toast-inline"><strong>Imported {sum(1 for r in res if r["added"])}/{len(res)} from IMDb list.</strong></div><ul>{rows}</ul><a href="/">back</a>'
             else:
-                body_html = '<div class="toast error">URL not recognised as IMDb list export. Try: https://www.imdb.com/list/ls.../export</div><a href="/">back</a>'
+                body_html = '<div class="toast-inline error"><strong>URL not recognised.</strong> Use an IMDb list export link - e.g. https://www.imdb.com/list/ls.../export</div><a href="/">back</a>'
             self._render(_html(body_html))
             return
 
