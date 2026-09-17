@@ -22,6 +22,11 @@
 #             error". Script body is now unindented (column 1) so the
 #             shebang lands at byte 0; the closer `'';` is also at column 1
 #             so minimum-indent stripping leaves the body unchanged.
+#   - v0.0.8: Put curl on PATH inside the container. The archive.org
+#             fallback and /debug endpoints shell out to bare `curl`, which
+#             didn't exist in the minimal pup container ("No such file or
+#             directory: 'curl'"). run.sh now exports a PATH entry pointing
+#             at the nix store curl so every call site resolves.
 #
 # All upstream APIs are configured via /storage/config/upstreams.json
 # (written at first boot by the install; user can edit manually).
@@ -113,6 +118,11 @@ $CP ${liveJs}        /storage/config/live.js
 # Stage the Python script too (it lives next to live.js so the
 # relative path resolution works).
 $CP ${webScript}    /storage/config/library-web.py
+
+# Make curl reachable by the Python server's subprocess calls (archive.org
+# download + qB push, /debug endpoints). The container has no /usr/bin —
+# only absolute store paths work, so hand the interpreter a PATH prefix.
+export PATH=${pkgs.curl}/bin:$PATH
 
 # Start the Python web server. live.js is served as a static route.
 $ECHO "[library-pup] starting on :9100"

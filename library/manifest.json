@@ -2,10 +2,10 @@
   "manifestVersion": 1,
   "meta": {
     "name": "Library",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "logoPath": "logo.png",
     "shortDescription": "Per-user unified media library for Dogebox",
-    "longDescription": "Front-end for the existing Radarr + Sonarr + Prowlarr + Jellyfin stack. Per-user profiles (filters out items already in each Jellyfin user's library), unified search, one-click add, starter packs, IMDb/Trakt watchlist import, free-text Tonight recommender, and a \ud83c\udfb2 Random Pick button. New in 0.0.7: archive.org public-domain fallback with direct qBittorrent push when Prowlarr is blocked, expanded interactive UI layer, /import crash fix, and /debug endpoints. No new indexers, no new download pipeline, no new library model.",
+    "longDescription": "Front-end for the existing Radarr + Sonarr + Prowlarr + Jellyfin stack. Per-user profiles (filters out items already in each Jellyfin user's library), unified search, one-click add, starter packs, IMDb/Trakt watchlist import, free-text Tonight recommender, and a 🎲 Random Pick button. New in 0.0.7: archive.org public-domain fallback with direct qBittorrent push when Prowlarr is blocked, expanded interactive UI layer, /import crash fix, and /debug endpoints. No new indexers, no new download pipeline, no new library model.",
     "upstreamVersions": {
       "Radarr": "6.x",
       "Sonarr": "4.x",
@@ -19,7 +19,7 @@
   "container": {
     "build": {
       "nixFile": "pup.nix",
-      "nixFileSha256": "0a51d56721a5ba081faf98da6e249d94ce4c935f411140d3d14b8dfd430d9b1e"
+      "nixFileSha256": "ec7bb0ffa4d19b4aec4f400922237cd3fcb023d01beff6a65b450884db61e7a8"
     },
     "services": [
       {
