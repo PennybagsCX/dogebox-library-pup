@@ -98,3 +98,9 @@ Edit on the box (`ssh shibe@10.0.0.98; sudo vi /opt/dogebox/pups/storage/<librar
 ## License
 
 MIT for the packaging. ClamAV/Radarr/Sonarr/Prowlarr/Jellyfin are GPL/commercial — this pup only talks to them via REST.
+
+## Host setup note: archive.org multi-format imports (2026-09-18)
+
+Archive.org **item torrents** ship every derivative format of a title (`mp4`/`ogv`/`flv`/`mov`/`wmv`/`m4v` + `_meta.*` + previews). Jellyfin renders **one library entry per video file**, so wholesale-copying these folders into the media dir creates duplicate entries (and `*512kb*` derivatives become separate bogus titles).
+
+The recommended host-side setup (see wow-20 ops manual §13): the `radarr-to-jellyfin` sync timer carries a **keep-one-video prune** (largest mainstream-container file per folder, AppleDouble-aware), and `qb-to-arrs` routes `SxxEyy`/`Season N` paths to Sonarr with everything else going to Radarr. Without that prune, every archive.org download will re-create duplicates in Jellyfin.
