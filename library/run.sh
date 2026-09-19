@@ -2,6 +2,7 @@
 set -e
 MKDIR=${pkgs.coreutils}/bin/mkdir
 CP=${pkgs.coreutils}/bin/cp
+RM=${pkgs.coreutils}/bin/rm
 ECHO=${pkgs.coreutils}/bin/echo
 CAT=${pkgs.coreutils}/bin/cat
 
@@ -23,12 +24,17 @@ JSON
 fi
 
 # Stage the bundled starter packs + JS into /storage/config/ so the
-# Python script can read them at runtime.
+# Python script can read them at runtime. rm -f first: a read-only file
+# left behind by a backup restore would otherwise fail the cp and (with
+# set -e) crash-loop the service on every boot (seen 2026-09-18).
+$RM -f /storage/config/starter-packs.json
 $CP ${starterPacks} /storage/config/starter-packs.json
+$RM -f /storage/config/live.js
 $CP ${liveJs}        /storage/config/live.js
 
 # Stage the Python script too (it lives next to live.js so the
 # relative path resolution works).
+$RM -f /storage/config/library-web.py
 $CP ${webScript}    /storage/config/library-web.py
 
 # Start the Python web server. live.js is served as a static route.
