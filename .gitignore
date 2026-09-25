@@ -1,0 +1,6 @@
+# runtime state — lives on the box, never in the repo
+/storage/
+
+# python artifacts
+__pycache__/
+*.pyc
